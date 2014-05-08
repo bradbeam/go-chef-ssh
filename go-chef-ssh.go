@@ -1,20 +1,30 @@
 package main
 
-//https://github.com/inatus/ssh-client-go
 import (
-	"bufio"
+	// "bufio"
 	"code.google.com/p/go.crypto/ssh"
 	"flag"
 	"fmt"
 	"github.com/howeyc/gopass"
 	"github.com/marpaia/chef-golang"
-	"log"
+	"net"
+	// "log"
+	"io"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
 	//	"errors"
 )
+
+type configops struct {
+	sshUser     string
+	sshPassword string
+	chefNode    string
+	chefServer  string
+	configFile  string
+	sshPort     int
+}
 
 // This is our way of translating the OS Signals into
 // appropriate SSH signals
@@ -60,22 +70,40 @@ func handleSignals(session ssh.Session) {
 
 // This sets up our connection to the chef server and queries
 // it for the node's IP address
-func getChefInfo(configFile string, chefNode string, sshPort int) (ipaddr string, err error) {
-	c, err := chef.Connect(configFile)
+func getChefInfo(config *configops) (ipaddr string, err error) {
+	c, err := chef.Connect(config.configFile)
 	if err != nil {
 		return "", err
 	}
 	c.SSLNoVerify = true
 
 	// Print detailed information about a specific node
-	node, ok, err := c.GetNode(chefNode)
+	node, ok, err := c.GetNode(config.chefNode)
 	if err != nil {
 		return "", err
 	} else if !ok {
 		return "", err
 	}
 
-	return node.Info.IPAddress + ":" + strconv.Itoa(sshPort), nil
+	return node.Info.IPAddress + ":" + strconv.Itoa(config.sshPort), nil
+}
+
+// Maybe this will allow for session termination on exit
+func myreaders(readers ...io.Reader) {
+	// Transform syscall signals to ssh signals
+	for _, reader := range readers {
+		go func() {
+			io.Copy(os.Stdout, reader)
+		}()
+	}
+}
+
+// Maybe this will allow for session termination on exit
+func mywriter(writer io.Writer) {
+	// Transform syscall signals to ssh signals
+	go func() {
+		io.Copy(writer, os.Stdin)
+	}()
 }
 
 // Maybe this will allow for session termination on exit
@@ -89,71 +117,82 @@ func sessionWatchdog(session ssh.Session, conn ssh.Client) {
 	}()
 }
 
-func main() {
-	var sshUser string
-	var sshPassword string
-	var chefNode string
-	var chefServer string
-	var configFile string
-	var sshPort int
-	flag.StringVar(&sshUser, "user", os.Getenv("USER"), "The username to connect to the remote server as")
-	flag.StringVar(&sshPassword, "password", "", "The password to connect to the remote server with")
-	flag.StringVar(&chefNode, "node", "", "The chef node name")
-	flag.StringVar(&chefServer, "server", "", "The chef server name")
-	flag.StringVar(&configFile, "config", "", "Optional knife.rb/client.rb path")
-	flag.IntVar(&sshPort, "port", 22, "SSH port to connect to")
+// Handle oll of our CLI input and add them to a configops struct
+func parseFlags() (config *configops, err error) {
+	configobj := new(configops)
+	flag.StringVar(&configobj.sshUser, "user", os.Getenv("USER"), "The username to connect to the remote server as")
+	flag.StringVar(&configobj.sshPassword, "password", "", "The password to connect to the remote server with")
+	flag.StringVar(&configobj.chefNode, "node", "", "The chef node name")
+	flag.StringVar(&configobj.chefServer, "server", "", "The chef server name")
+	flag.StringVar(&configobj.configFile, "config", "", "Optional knife.rb/client.rb path")
+	flag.IntVar(&configobj.sshPort, "port", 22, "SSH port to connect to")
 	flag.Parse()
 
 	// Need to define at least a chef node
-	if chefNode == "" {
+	if configobj.chefNode == "" {
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	serverAddress, err := getChefInfo(configFile, chefNode, sshPort)
+	if configobj.sshPassword == "" {
+		fmt.Print(configobj.sshUser + "@" + configobj.chefNode + "'s Password: ")
+		configobj.sshPassword = string(gopass.GetPasswdMasked())
+	}
+
+	return configobj, nil
+}
+
+// Yummy yummy main!
+func main() {
+	configcli, err := parseFlags()
+	if err != nil {
+		fmt.Print(err.Error())
+		os.Exit(1)
+	}
+
+	serverAddress, err := getChefInfo(configcli)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
 	// Get SSH session set up
-	if sshPassword == "" {
-		fmt.Print(sshUser + "@" + serverAddress + "'s Password: ")
-		sshPassword = string(gopass.GetPasswdMasked())
-	}
-
 	clientConfig := &ssh.ClientConfig{
-		User: sshUser,
+		User: configcli.sshUser,
 		Auth: []ssh.AuthMethod{
-			ssh.Password(sshPassword),
+			ssh.Password(configcli.sshPassword),
 		},
 	}
 
-	conn, err := ssh.Dial("tcp", serverAddress, clientConfig)
+	// Connect to the remote host
+	conn, err := net.Dial("tcp", serverAddress)
 	if err != nil {
 		fmt.Println("Unable to connect to " + serverAddress)
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
+	// Make sure we clean up
 	defer conn.Close()
 
-	// Each ClientConn can support multiple interactive sessions,
-	// represented by a Session.
-	session, err := conn.NewSession()
+	// Generate a client
+	c, chans, reqs, err := ssh.NewClientConn(conn, serverAddress, clientConfig)
+	if err != nil {
+		fmt.Println("Unable to connect to " + serverAddress)
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+
+	client := ssh.NewClient(c, chans, reqs)
+
+	// Establish a session
+	session, err := client.NewSession()
 	if err != nil {
 		panic("Failed to create session: " + err.Error())
 	}
+
+	// Make sure we clean up
 	defer session.Close()
-
-	// Spawn a handler for signals so we can send them
-	// through the session to the remote host
-	//handleSignals(*session)
-
-	// Redirect Session IO to local machine
-	session.Stdout = os.Stdout
-	session.Stderr = os.Stderr
-	in, _ := session.StdinPipe()
 
 	// Set up terminal modes
 	modes := ssh.TerminalModes{
@@ -164,23 +203,26 @@ func main() {
 
 	// Request pseudo terminal
 	if err := session.RequestPty("xterm", 80, 40, modes); err != nil {
-		log.Fatalf("request for pseudo terminal failed: %s", err)
+		panic("request for pseudo terminal failed:" + err.Error())
 	}
 
-	// Start remote shell
-	// if err := session.Shell(); err != nil {
-	// 	log.Fatalf("failed to start shell: %s", err)
-	// }
-	err = session.Shell()
-	if err != nil {
-		log.Fatalf("failed to start shell: %s", err)
+	// Redirect Session IO to local machine
+	// session.Stdout = os.Stdout
+	// session.Stderr = os.Stderr
+	sout, _ := session.StdoutPipe()
+	//serr, _ := session.StderrPipe()
+	sin, _ := session.StdinPipe()
+
+	// defer sout.Close()
+	// defer serr.Close()
+	defer sin.Close()
+
+	if err := session.Shell(); err != nil {
+		panic("failed to start shell: " + err.Error())
 	}
 
-	//sessionWatchdog(*session, *conn)
-	// Accepting commands until a clean exit
-	for {
-		reader := bufio.NewReader(os.Stdin)
-		str, _ := reader.ReadString('\n')
-		fmt.Fprint(in, str)
-	}
+	myreaders(sout)
+	mywriter(sin)
+	defer session.Wait()
+
 }
