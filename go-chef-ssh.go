@@ -58,6 +58,8 @@ func handleSignals(session ssh.Session) {
 	}()
 }
 
+// This sets up our connection to the chef server and queries
+// it for the node's IP address
 func getChefInfo(configFile string, chefNode string, sshPort int) (ipaddr string, err error) {
 	c, err := chef.Connect(configFile)
 	if err != nil {
@@ -76,6 +78,7 @@ func getChefInfo(configFile string, chefNode string, sshPort int) (ipaddr string
 	return node.Info.IPAddress + ":" + strconv.Itoa(sshPort), nil
 }
 
+// Maybe this will allow for session termination on exit
 func sessionWatchdog(session ssh.Session, conn ssh.Client) {
 	// Transform syscall signals to ssh signals
 	go func() {
@@ -88,11 +91,13 @@ func sessionWatchdog(session ssh.Session, conn ssh.Client) {
 
 func main() {
 	var sshUser string
+	var sshPassword string
 	var chefNode string
 	var chefServer string
 	var configFile string
 	var sshPort int
 	flag.StringVar(&sshUser, "user", os.Getenv("USER"), "The username to connect to the remote server as")
+	flag.StringVar(&sshPassword, "password", "", "The password to connect to the remote server with")
 	flag.StringVar(&chefNode, "node", "", "The chef node name")
 	flag.StringVar(&chefServer, "server", "", "The chef server name")
 	flag.StringVar(&configFile, "config", "", "Optional knife.rb/client.rb path")
@@ -112,13 +117,15 @@ func main() {
 	}
 
 	// Get SSH session set up
-	fmt.Print(sshUser + "@" + serverAddress + "'s Password: ")
-	password := string(gopass.GetPasswdMasked())
+	if sshPassword == "" {
+		fmt.Print(sshUser + "@" + serverAddress + "'s Password: ")
+		sshPassword = string(gopass.GetPasswdMasked())
+	}
 
 	clientConfig := &ssh.ClientConfig{
 		User: sshUser,
 		Auth: []ssh.AuthMethod{
-			ssh.Password(password),
+			ssh.Password(sshPassword),
 		},
 	}
 
