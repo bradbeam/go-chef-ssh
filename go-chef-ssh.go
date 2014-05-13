@@ -26,43 +26,162 @@ type configops struct {
 	sshPort     int
 }
 
+type Signal string
+
+// Updating signals to include additional/all signals
+const (
+	SIGHUP    Signal = "HUP"
+	SIGINT    Signal = "INT"
+	SIGQUIT   Signal = "QUIT"
+	SIGILL    Signal = "ILL"
+	SIGTRAP   Signal = "TRAP"
+	SIGABRT   Signal = "ABRT"
+	SIGEMT    Signal = "EMT"
+	SIGFPE    Signal = "FPE"
+	SIGKILL   Signal = "KILL"
+	SIGBUS    Signal = "BUS"
+	SIGSEGV   Signal = "SEGV"
+	SIGSYS    Signal = "SYS"
+	SIGPIPE   Signal = "PIPE"
+	SIGALRM   Signal = "ALRM"
+	SIGTERM   Signal = "TERM"
+	SIGURG    Signal = "URG"
+	SIGSTOP   Signal = "STOP"
+	SIGTSTP   Signal = "TSTP"
+	SIGCONT   Signal = "CONT"
+	SIGCHLD   Signal = "CHLD"
+	SIGTTIN   Signal = "TTIN"
+	SIGTTOU   Signal = "TTOU"
+	SIGIO     Signal = "IO"
+	SIGXCPU   Signal = "XCPU"
+	SIGXFSZ   Signal = "XFSZ"
+	SIGVTALRM Signal = "VTALRM"
+	SIGPROF   Signal = "PROF"
+	SIGWINCH  Signal = "WINCH"
+	SIGINFO   Signal = "INFO"
+	SIGUSR1   Signal = "USR1"
+	SIGUSR2   Signal = "USR2"
+)
+
+var signals = map[Signal]int{
+	SIGHUP:    1,
+	SIGINT:    2,
+	SIGQUIT:   3,
+	SIGILL:    4,
+	SIGTRAP:   5,
+	SIGABRT:   6,
+	SIGEMT:    7,
+	SIGFPE:    8,
+	SIGKILL:   9,
+	SIGBUS:    10,
+	SIGSEGV:   11,
+	SIGSYS:    12,
+	SIGPIPE:   13,
+	SIGALRM:   14,
+	SIGTERM:   15,
+	SIGURG:    16,
+	SIGSTOP:   17,
+	SIGTSTP:   18,
+	SIGCONT:   19,
+	SIGCHLD:   20,
+	SIGTTIN:   21,
+	SIGTTOU:   22,
+	SIGIO:     23,
+	SIGXCPU:   24,
+	SIGXFSZ:   25,
+	SIGVTALRM: 26,
+	SIGPROF:   27,
+	SIGWINCH:  28,
+	SIGINFO:   29,
+	SIGUSR1:   30,
+	SIGUSR2:   31,
+}
+
 // This is our way of translating the OS Signals into
 // appropriate SSH signals
 func handleSignals(session ssh.Session) {
+
 	c := make(chan os.Signal, 1)
-
 	signal.Notify(c)
-
+	return
 	// Transform syscall signals to ssh signals
 	go func() {
+		// sigs := new(Signal)
+		// fmt.Println(ssh.Signal(signals[SIGIO]))
 		for sig := range c {
 			switch sig {
 			case syscall.SIGABRT:
-				_ = session.Signal(ssh.SIGABRT)
+				err := session.Signal(ssh.Signal(signals[SIGABRT]))
+				if err != nil {
+					fmt.Println("Unable to send signal")
+				}
 			case syscall.SIGALRM:
-				_ = session.Signal(ssh.SIGALRM)
+				err := session.Signal(ssh.Signal(signals[SIGALRM]))
+				if err != nil {
+					fmt.Println("Unable to send signal")
+				}
 			case syscall.SIGFPE:
-				_ = session.Signal(ssh.SIGFPE)
+				err := session.Signal(ssh.Signal(signals[SIGFPE]))
+				if err != nil {
+					fmt.Println("Unable to send signal")
+				}
 			case syscall.SIGHUP:
-				_ = session.Signal(ssh.SIGHUP)
-			case syscall.SIGILL:
-				_ = session.Signal(ssh.SIGILL)
+				err := session.Signal(ssh.Signal(signals[SIGHUP]))
+				if err != nil {
+					fmt.Println("Unable to send signal")
+				}
+			// case syscall.SIGILL:
+			// 	err := session.Signal(ssh.Signal(signals[SIGILL)
 			case syscall.SIGINT:
-				_ = session.Signal(ssh.SIGINT)
-			case syscall.SIGKILL:
-				_ = session.Signal(ssh.SIGKILL)
+				err := session.Signal(ssh.Signal(signals[SIGINT]))
+				if err != nil {
+					fmt.Println("Unable to send signal")
+				}
+			case syscall.SIGSTOP:
+				err := session.Signal(ssh.Signal(signals[SIGSTOP]))
+				if err != nil {
+					fmt.Println("Unable to send signal")
+				}
+			case syscall.SIGTSTP:
+				err := session.Signal(ssh.Signal(signals[SIGTSTP]))
+				if err != nil {
+					fmt.Println("Unable to send signal")
+				}
+			// case syscall.SIGKILL:
+			// 	err := session.Signal(ssh.Signal(signals[SIGKILL]))
+			// 	if err != nil {
+			// 		fmt.Println("Unable to send signal")
+			// 	}
 			case syscall.SIGPIPE:
-				_ = session.Signal(ssh.SIGPIPE)
+				err := session.Signal(ssh.Signal(signals[SIGPIPE]))
+				if err != nil {
+					fmt.Println("Unable to send signal")
+				}
 			case syscall.SIGQUIT:
-				_ = session.Signal(ssh.SIGQUIT)
+				err := session.Signal(ssh.Signal(signals[SIGQUIT]))
+				if err != nil {
+					fmt.Println("Unable to send signal")
+				}
 			case syscall.SIGSEGV:
-				_ = session.Signal(ssh.SIGSEGV)
+				err := session.Signal(ssh.Signal(signals[SIGSEGV]))
+				if err != nil {
+					fmt.Println("Unable to send signal")
+				}
 			case syscall.SIGTERM:
-				_ = session.Signal(ssh.SIGTERM)
+				err := session.Signal(ssh.Signal(signals[SIGTERM]))
+				if err != nil {
+					fmt.Println("Unable to send signal")
+				}
 			case syscall.SIGUSR1:
-				_ = session.Signal(ssh.SIGUSR1)
+				err := session.Signal(ssh.Signal(signals[SIGUSR1]))
+				if err != nil {
+					fmt.Println("Unable to send signal")
+				}
 			case syscall.SIGUSR2:
-				_ = session.Signal(ssh.SIGUSR2)
+				err := session.Signal(ssh.Signal(signals[SIGUSR2]))
+				if err != nil {
+					fmt.Println("Unable to send signal")
+				}
 			}
 		}
 	}()
@@ -89,13 +208,18 @@ func getChefInfo(config *configops) (ipaddr string, err error) {
 }
 
 // Maybe this will allow for session termination on exit
-func myreaders(readers ...io.Reader) {
+func mystdoutreader(reader io.Reader) {
 	// Transform syscall signals to ssh signals
-	for _, reader := range readers {
-		go func() {
-			io.Copy(os.Stdout, reader)
-		}()
-	}
+	go func() {
+		io.Copy(os.Stdout, reader)
+	}()
+}
+
+func mystderrreader(reader io.Reader) {
+	// Transform syscall signals to ssh signals
+	go func() {
+		io.Copy(os.Stderr, reader)
+	}()
 }
 
 // Maybe this will allow for session termination on exit
@@ -196,7 +320,15 @@ func main() {
 
 	// Set up terminal modes
 	modes := ssh.TerminalModes{
-		ssh.ECHO:          0,      // disable echoing since we handle
+		// Works
+		ssh.ECHO:          0, // disable echoing since we handle
+		ssh.ECHOCTL:       1, // enable echoing of control characters
+		ssh.VINTR:         3, // Ctrl+c for interrupt
+		ssh.IXANY:         1,
+		ssh.ECHOK:         0,
+		ssh.VEOL:          255,
+		ssh.VEOL2:         255,
+		ssh.IMAXBEL:       1,
 		ssh.TTY_OP_ISPEED: 115200, // input speed = 115.2k baud ISDN!!
 		ssh.TTY_OP_OSPEED: 115200, // output speed = 115.2k baud
 	}
@@ -207,10 +339,10 @@ func main() {
 	}
 
 	// Redirect Session IO to local machine
-	// session.Stdout = os.Stdout
-	// session.Stderr = os.Stderr
-	sout, _ := session.StdoutPipe()
-	//serr, _ := session.StderrPipe()
+	session.Stdout = os.Stdout
+	session.Stderr = os.Stderr
+	// sout, _ := session.StdoutPipe()
+	// serr, _ := session.StderrPipe()
 	sin, _ := session.StdinPipe()
 
 	// defer sout.Close()
@@ -221,7 +353,9 @@ func main() {
 		panic("failed to start shell: " + err.Error())
 	}
 
-	myreaders(sout)
+	handleSignals(*session)
+	// mystdoutreader(session.St)
+	// mystderrreader(serr)
 	mywriter(sin)
 	defer session.Wait()
 
