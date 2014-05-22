@@ -99,11 +99,12 @@ var signals = map[Signal]int{
 
 // This is our way of translating the OS Signals into
 // appropriate SSH signals
-func handleSignals(session ssh.Session) {
+func handleSignals(session *ssh.Session, sin io.WriteCloser) {
 
 	c := make(chan os.Signal, 1)
+	// d := make(chan *ssh.Signal, 1)
 	signal.Notify(c)
-	return
+
 	// Transform syscall signals to ssh signals
 	go func() {
 		// sigs := new(Signal)
@@ -133,10 +134,22 @@ func handleSignals(session ssh.Session) {
 			// case syscall.SIGILL:
 			// 	err := session.Signal(ssh.Signal(signals[SIGILL)
 			case syscall.SIGINT:
-				err := session.Signal(ssh.Signal(signals[SIGINT]))
+				err := session.Signal(ssh.SIGKILL)
+
+				// err = session.Signal(ssh.SIGKILL)
+				// err = session.Signal(ssh.SIGKILL)
+				// err = session.Signal(ssh.SIGKILL)
 				if err != nil {
 					fmt.Println("Unable to send signal")
 				}
+				// err = session.Signal(ssh.Signal(signals[SIGKILL]))
+
+				//
+				// // signal.Notify(d)
+				// fmt.Print("SIGINT!")
+				// fmt.Fprintf(sin, syscall.SIGINT)
+				// signal.Notify(d)
+				// _ = session.Signal(ssh.SIGINT)
 			case syscall.SIGSTOP:
 				err := session.Signal(ssh.Signal(signals[SIGSTOP]))
 				if err != nil {
@@ -339,10 +352,10 @@ func main() {
 	}
 
 	// Redirect Session IO to local machine
-	session.Stdout = os.Stdout
-	session.Stderr = os.Stderr
-	// sout, _ := session.StdoutPipe()
-	// serr, _ := session.StderrPipe()
+	// session.Stdout = os.Stdout
+	// session.Stderr = os.Stderr
+	sout, _ := session.StdoutPipe()
+	serr, _ := session.StderrPipe()
 	sin, _ := session.StdinPipe()
 
 	// defer sout.Close()
@@ -353,9 +366,9 @@ func main() {
 		panic("failed to start shell: " + err.Error())
 	}
 
-	handleSignals(*session)
-	// mystdoutreader(session.St)
-	// mystderrreader(serr)
+	handleSignals(session, sin)
+	mystdoutreader(sout)
+	mystderrreader(serr)
 	mywriter(sin)
 	defer session.Wait()
 
